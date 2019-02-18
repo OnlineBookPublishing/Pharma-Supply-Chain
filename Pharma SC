@@ -30,7 +30,7 @@ packageState public packagestate;
     int onTheWay;  //to track the route 1 , 0
    
 //constructor
-    function IoTContainer(){
+    function PharmaPackage(){
         startDate = block.timestamp;
          receivedAfter = 3;//3 days maximum for providing another secret code
          pharmacrate = "This package contains pharmaceutical product";
@@ -53,11 +53,11 @@ modifier  OnlySeller(){ //only pharma seller
         require(seller == msg.sender); 
         _;
     }
-modifier  OnlyConsumer() { //only consumer or patient
+modifier  OnlyConsumer() { //only consumer
         require(consumer==msg.sender); 
         _;
  }
- modifier OnlyDistributor() { 
+ modifier OnlyDistributor() {
      require(distributor==msg.sender);
      _;
       }
@@ -68,7 +68,7 @@ modifier amountsto() {
     
 //Events
 
-event PharmaPackagingCompleted(address seller, string info);
+event PharmaPackagingCreated(address seller, string info);
 event DistributionPrepared(address distributor, string info);
 event CheckingCompleted(string info);
 event CheckCompleted(string info);
@@ -78,10 +78,10 @@ event FreightArrivedToDestination(string msg, address container);
 event ConsumerSuccessfullyAuthenticated(string msg, address consumer);
 event ConsumerFailedAuthentication(string msg, address consumer);//failure within 72 hours
 event AuthenticationPermFailed(string msg, address consumer);
-event PackageReceived(address consumer);// ShipmentReceived Succesfully
+event PackageReceived(address consumer);// PackageReceived at consumer end
 event ShipmentCancelledandRefunded(address container);//shipment violated and refund occured
 event PaymentReleased(address sender, string info);
-event ShipmentDelayedandRefunded(address container);
+event ShipmentCancelledandRefunded(address container);
 
 
 // Events involving breach 
@@ -91,21 +91,16 @@ event ShipmentDelayedandRefunded(address container);
     
 //Functions -------------> Pharma Package from Seller to EndConsumers
 
-function CreatePharmaPackage() OnlySeller {
+function createPharmaPackage() OnlySeller {
         require(packagestate == packageState.NotReady);
          packagestate = packageState.PharmaPackageReady; //once locked the container will do a self check on the sensors
-         PharmaPackagingCompleted(msg.sender, "The package is ready now!"); //trigger event
+         PharmaPackagingCreated(msg.sender, "The package is ready now!"); //trigger event
     }
 
-function DistributeToCustomer() OnlyDistributor {
-    require(packagestate==packageState.PharmaPackageReady);
-       packagestate=packageState.DistributeToConsumer; // get ready for distribution.
-       DistributionPrepared(msg.sender, "Package packed and reached distributor"); //trigger event
-}
 
-function PerformPackageCheck(int results) OnlyContainer {
+function performPackageCheck(int results) OnlyContainer {
        
-        require(packagestate == packageState.DistributeToConsumer);
+        require(packagestate == packageState.PharmaPackageReady);
         result = results;
         
         if(result == 1){    // result is : Ready
@@ -114,30 +109,30 @@ function PerformPackageCheck(int results) OnlyContainer {
         }
           else if(result == 0) {
             packagestate = packageState.Aborted;
-            CheckCompleted(" Failure: container must be fixed."); //trigger event with result
+            CheckingCompleted(" Failure: container must be fixed."); //trigger event with result
              selfdestruct(msg.sender);
         }
 }
 //Consumer deposits money and send the hash
-  function DepositMoneyforPackageShipment(bytes32 hash)  payable  OnlyConsumer amountsto {
+  function depositMoneyforPackageShipment(bytes32 hash)  payable  OnlyConsumer amountsto {
          require(packagestate == packageState.FreightReady);//this indicates that self check is OK
             packagestate = packageState.MoneyDeposited;
             secrtcode = hash;
             MoneyDeposited("Money deposited and secret hash provided" , msg.sender); //trigger event
     }
 
-  function StartShipping() OnlySeller {
+  function startShipping() OnlySeller {
         require(packagestate == packageState.MoneyDeposited);
             packagestate = packageState.StartShipment;
             StartedShipping(msg.sender,"Package is shipped!"); //trigger event
     }
     
-  function FreightArrived() OnlyContainer{//called when the freight arrives to destination
+  function freightArrived() OnlyContainer{//called when the freight arrives to destination
           require(packagestate == packageState.StartShipment); //only if no violations
             packagestate = packageState.WaitingforSecretCode;
             FreightArrivedToDestination("Consumer --> Please provide your secret code now :", msg.sender );
     }
-  function ProvideSecretCode(string code) OnlyConsumer {
+  function provideSecretCode(string code) OnlyConsumer {
      require((packagestate == packageState.WaitingforSecretCode || packagestate == packageState.WaitingForCorrectCode) && breach == breachType.None);
             acquiredCodeToBehashed = code;
             if(secrtcode == keccak256(acquiredCodeToBehashed)){//authenticated
@@ -150,9 +145,9 @@ function PerformPackageCheck(int results) OnlyContainer {
             }
         
       }      
-  function ProvideCodeLater(string phrase) OnlyConsumer {
+  function provideCodeLater(string phrase) OnlyConsumer {
         if (block.timestamp <= startDate + receivedAfter * 1 days) {
-            ProvideSecretCode(phrase);
+            provideSecretCode(phrase);
         }
         else//it will be more than 3 days
         {
@@ -181,7 +176,7 @@ function PerformPackageCheck(int results) OnlyContainer {
         require(packagestate == packageState.Aborted);//breach hasn't occured
         if(breach != breachType.None){
             consumer.transfer(freightTariff);
-            ShipmentDelayedandRefunded(msg.sender);
+            ShipmentCancelledandRefunded(msg.sender);
             selfdestruct(msg.sender);
         }
     }
