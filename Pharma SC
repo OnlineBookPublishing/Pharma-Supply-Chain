@@ -17,6 +17,7 @@ MoneyDeposited,StartShipment,WaitingforSecretCode, WaitingForCorrectCode,
 AuthenticatedByConsumer,AuthenticationFailureAborted,FreightReceived, Aborted}  // state of package at different times
 
 packageState public packagestate; 
+   string batchNumber;
    uint startDate;
    uint receivedAfter;
    uint freightTariff;
@@ -31,7 +32,8 @@ packageState public packagestate;
    
 //constructor
     function PharmaPackage(){
-        startDate = block.timestamp;
+      batchNumber= "Xrdpf"
+      startDate = block.timestamp;
          receivedAfter = 3;//3 days maximum for providing another secret code
          pharmacrate = "This package contains pharmaceutical product";
          freightTariff = 10 ether;
